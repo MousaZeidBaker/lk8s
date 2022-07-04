@@ -1,0 +1,50 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: hello
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: hello
+  template:
+    metadata:
+      labels:
+        app: hello
+      annotations: 
+        test: test
+    spec:
+      containers:
+      - name: hello
+        image: hello:latest
+        imagePullPolicy: Never
+        ports:
+        - containerPort: 8080
+        envFrom:
+        - secretRef:
+            name: hello
+        readinessProbe:
+          httpGet:
+            path: /v1/readyz
+            port: 8080
+          initialDelaySeconds: 3
+          periodSeconds: 10
+        livenessProbe:
+          httpGet:
+            path: /v1/livez
+            port: 8080
+          initialDelaySeconds: 3
+          periodSeconds: 10
+        startupProbe:
+          httpGet:
+            path: /v1/livez
+            port: 8080
+          failureThreshold: 5
+          periodSeconds: 10
+        resources:
+          limits:
+            cpu: "50m"
+            memory: "100Mi"
+          requests:
+            cpu: "25m"
+            memory: "10Mi"
