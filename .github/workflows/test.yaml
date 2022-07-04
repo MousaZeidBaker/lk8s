@@ -1,0 +1,35 @@
+name: Test
+on:
+  pull_request:
+    branches:
+      - '*'
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v2
+
+      - name: Start a local Kubernetes cluster
+        run: |
+          curl -LO https://storage.googleapis.com/minikube/releases/v1.26.0/minikube-linux-amd64
+          sudo install minikube-linux-amd64 /usr/local/bin/minikube
+          minikube start --addons=ingress
+
+      - name: Build Docker images
+        run: for DIR in apps/**; do minikube image build --tag ${DIR##*/} $DIR; done
+
+      - name: Deploy apps
+        run: |
+          for DIR in kubernetes/**; do cp $DIR/.env.example $DIR/.env; done
+          for DIR in kubernetes/**; do kubectl apply -k $DIR; done
+          echo "Waiting for service endpoints to become active.."
+          sleep 20
+          kubectl get endpoints
+
+      - name: Test hello app
+        run: |
+          NODE_IP=$(minikube ip)
+          NODE_PORT=$(kubectl get svc ingress-nginx-controller --namespace ingress-nginx --output jsonpath='{.spec.ports[?(@.name=="http")].nodePort}')
+          curl --fail --verbose --silent http://$NODE_IP:$NODE_PORT/hello/v1/echo
