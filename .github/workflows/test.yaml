@@ -1,0 +1,47 @@
+name: Test
+on:
+  pull_request:
+    branches:
+      - '*'
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v2
+
+      - name: Lint
+        run: |
+          pip install yamllint
+          yamllint .
+
+      - name: Start a local Kubernetes cluster
+        run: |
+          curl -s https://raw.githubusercontent.com/k3d-io/k3d/main/install.sh | TAG=v5.4.4 bash
+          k3d cluster create --config k3d-config.yaml
+          docker ps
+
+      - name: Build Docker images
+        run: |
+          for DIR in apps/**; do docker build --tag ${DIR##*/} --tag localhost:5000/${DIR##*/} $DIR; done
+          for DIR in apps/**; do docker push localhost:5000/${DIR##*/}; done
+          curl "http://localhost:5000/v2/_catalog"
+
+      - name: Deploy apps
+        run: |
+          for DIR in kubernetes/*/; do cp --no-clobber $DIR/.env.example $DIR/.env; done
+          kubectl apply --kustomize kubernetes
+          echo "Waiting for service endpoints to become active.."
+          sleep 40
+          kubectl get endpoints
+
+      - name: Test hello app
+        run: |
+          curl --fail --silent "http://hello.127.0.0.1.nip.io:8080/v1/echo"
+          curl --fail --silent --insecure "https://hello.127.0.0.1.nip.io:8443/v1/echo"
+
+      - name: Test whoami app
+        run: |
+          curl --fail --silent "http://whoami.127.0.0.1.nip.io:8080"
+          curl --fail --silent --insecure "https://whoami.127.0.0.1.nip.io:8443"
