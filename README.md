@@ -40,6 +40,7 @@ while traffic to `/bar` can be routed to a `bar` service.
 
 - [docker](https://docs.docker.com/get-docker/)
 - [k3d](https://k3d.io/) to setup a local Kubernetes cluster
+- [Flux CLI](https://fluxcd.io/flux/cmd/) a continuous delivery tool that keeps Kubernetes clusters in sync
 - [kubectl](https://kubernetes.io/docs/tasks/tools/#kubectl) to communicate with
   the cluster
 - port `8080` and `8443` must not be in use
@@ -64,6 +65,11 @@ Start a local Kubernetes cluster
 k3d cluster create --config k3d-config.yaml
 ```
 
+Install Flux onto the cluster
+```shell
+flux bootstrap git --url=git@github.com:MousaZeidBaker/lk8s.git --branch master --path ./clusters/prod
+```
+
 ### Build Docker images
 
 Images are usually built and pushed into a registry and then pulled (downloaded)
@@ -71,17 +77,18 @@ by a Kubernetes cluster. But when developing locally one can instead use a local
 registry. K3d has already created one, view it with `docker ps --filter
 name=registry`.
 
-Build images located in the `/apps` directory
+Build images located in the `/my-containers` directory
 ```shell
-for DIR in apps/**; do docker build --tag ${DIR##*/} --tag localhost:5000/${DIR##*/} $DIR; done
+for DIR in my-containers/**; do docker build --tag ${DIR##*/} --tag localhost:5000/${DIR##*/} $DIR; done
 ```
 
-> Note: Each directory inside `/apps` must contain a Dockerfile, the directory
-> name is used as the image name and images are tagged with the `latest` tag.
+> Note: Each directory inside `/my-containers` must contain a Dockerfile, the
+> directory name is used as the image name and images are tagged with the
+> `latest` tag.
 
 Push images to the local registry
 ```shell
-for DIR in apps/**; do docker push localhost:5000/${DIR##*/}; done
+for DIR in my-containers/**; do docker push localhost:5000/${DIR##*/}; done
 ```
 
 > Note: To list images in the local registry use `curl
@@ -121,11 +128,11 @@ Access `Kubernetes Dashboard` at
 
 Access `Wordpress` at [`http://wordpress.127.0.0.1.nip.io:8080/`](http://wordpress.127.0.0.1.nip.io:8080/)
 
-> Note: If an app inside `/apps` is modified make sure to first re-build the
-> image, then re-push it to the local registry, then destroy the related
-> deployment resource and lastly re-apply it. Otherwise changes won't be detected
-> because deployments are (for simplicity) configured to use the `latest` tag
-> instead of unique tags.
+> Note: If an app inside `/my-containers` is modified make sure to first
+> re-build the image, then re-push it to the local registry, then destroy the
+> related deployment resource and lastly re-apply it. Otherwise changes won't be
+> detected because deployments are (for simplicity) configured to use the
+> `latest` tag instead of unique tags.
 
 #### Port forwarding
 
