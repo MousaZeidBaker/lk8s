@@ -7,4 +7,5 @@ resources:
   - dashboard
   - hello
   - whoami
+  - wordpress
 ...

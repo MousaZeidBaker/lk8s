@@ -47,13 +47,17 @@ while traffic to `/bar` can be routed to a `bar` service.
 ## Getting started
 
 Following guide shows how to setup a local Kubernetes cluster and how to deploy
-a [hello](./apps/hello/) container mainteined locally and a
-[whoami](https://hub.docker.com/r/traefik/whoami) container maintained by 3rd
-parties that can be pulled from public container registries. Addiotionally, the
-[ingress-nginx](https://kubernetes.github.io/ingress-nginx/) controller and the
-[Kubernetes
+different containers:
+
+- [hello](./apps/hello/) container mainteined locally in `/apps` directory
+- [whoami](https://hub.docker.com/r/traefik/whoami) container maintained by 3rd
+parties that can be pulled from public container registries
+- [wordpress](https://hub.docker.com/r/bitnami/wordpress/) container with
+  [persistent
+  volumes](https://kubernetes.io/docs/concepts/storage/persistent-volumes/)
+- [ingress-nginx](https://kubernetes.github.io/ingress-nginx/) controller
+- [Kubernetes
 Dasboard](https://kubernetes.io/docs/tasks/access-application-cluster/web-ui-dashboard/)
-will be deployed.
 
 Start a local Kubernetes cluster 
 ```shell
@@ -85,10 +89,9 @@ for DIR in apps/**; do docker push localhost:5000/${DIR##*/}; done
 
 ### Deploy apps
 
-Copy `.env.example` to `.env` for each deployment and configure env variables as
-needed
+Copy `.env` file for each deployment and configure env variables as needed
 ```shell
-for DIR in kubernetes/*/; do cp --no-clobber $DIR/.env.example $DIR/.env; done
+find kubernetes -type f -name ".env.example" -exec sh -c 'cp --no-clobber ${1} ${1%/*}/.env' sh_cp {} \;
 ```
 
 Apply Kubernetes manifests. To delete resources replace `apply` with `delete`.
@@ -113,8 +116,10 @@ Hit `whoami` pod over HTTP
 curl "http://whoami.127.0.0.1.nip.io:8080"
 ```
 
-Access Kubernetes Dashboard at
+Access `Kubernetes Dashboard` at
 [`http://kubernetes.127.0.0.1.nip.io:8080/dashboard/`](http://kubernetes.127.0.0.1.nip.io:8080/dashboard/)
+
+Access `Wordpress` at [`http://wordpress.127.0.0.1.nip.io:8080/`](http://wordpress.127.0.0.1.nip.io:8080/)
 
 > Note: If an app inside `/apps` is modified make sure to first re-build the
 > image, then re-push it to the local registry, then destroy the related
@@ -184,9 +189,9 @@ kubectl logs deployment/helloGet a shell to the `hello` pod
 # show snapshot logs in pods defined by label app=hello
 kubectl logs --selector app=hello
 
-# show snapshot logs from the ingres-controller pod
+# stream logs from the ingres-controller pod
 POD_NAME=$(kubectl get pods --namespace ingress-nginx --selector app.kubernetes.io/component=controller --output jsonpath='{.items[*].metadata.name}')
-kubectl logs $POD_NAME --namespace ingress-nginx
+kubectl logs $POD_NAME --namespace ingress-nginx --follow
 
 # stream logs
 kubectl logs --selector app=hello --follow
