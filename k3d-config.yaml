@@ -4,7 +4,7 @@
 apiVersion: k3d.io/v1alpha4
 kind: Simple
 metadata:
-  name: cluster
+  name: kube
 servers: 1
 agents: 0
 kubeAPI:
@@ -13,7 +13,7 @@ kubeAPI:
 image: docker.io/rancher/k3s:v1.23.8-k3s1
 
 volumes:
-  - volume: $PWD/volumes:/host
+  - volume: $PWD/volumes/storage:/var/lib/rancher/k3s/storage
     nodeFilters:
       - all
 

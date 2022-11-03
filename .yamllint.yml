@@ -2,7 +2,7 @@
 extends: default
 
 ignore: |
-  volumes/registry
+  volumes
 
 rules:
   document-end:
@@ -16,5 +16,7 @@ rules:
     max: 120
   octal-values: enable
   quoted-strings:
+    quote-type: single
     required: only-when-needed
+    level: warning
 ...
