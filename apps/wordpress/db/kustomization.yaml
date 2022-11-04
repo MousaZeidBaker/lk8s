@@ -10,5 +10,5 @@ resources:
 secretGenerator:
   - name: wordpress-db
     envs:
-      - .env
+      - .env.example
 ...

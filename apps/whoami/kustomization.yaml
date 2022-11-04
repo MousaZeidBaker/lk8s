@@ -10,5 +10,5 @@ resources:
 secretGenerator:
   - name: whoami
     envs:
-      - .env
+      - .env.example
 ...

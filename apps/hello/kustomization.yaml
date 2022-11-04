@@ -10,5 +10,5 @@ resources:
 secretGenerator:
   - name: hello
     envs:
-      - .env
+      - .env.example
 ...
