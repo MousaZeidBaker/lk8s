@@ -24,14 +24,14 @@ jobs:
 
       - name: Build Docker images
         run: |
-          for DIR in apps/**; do docker build --tag ${DIR##*/} --tag localhost:5000/${DIR##*/} $DIR; done
-          for DIR in apps/**; do docker push localhost:5000/${DIR##*/}; done
+          for DIR in my-containers/**; do docker build --tag ${DIR##*/} --tag localhost:5000/${DIR##*/} $DIR; done
+          for DIR in my-containers/**; do docker push localhost:5000/${DIR##*/}; done
           curl "http://localhost:5000/v2/_catalog"
 
       - name: Deploy apps
         run: |
-          find kubernetes -type f -name ".env.example" -exec sh -c 'cp --no-clobber ${1} ${1%/*}/.env' sh_cp {} \;
-          kubectl apply --kustomize kubernetes
+          find apps -type f -name ".env.example" -exec sh -c 'cp --no-clobber ${1} ${1%/*}/.env' sh_cp {} \;
+          kubectl apply --kustomize apps
           echo "Waiting for service endpoints to become active.."
           sleep 40
           kubectl get endpoints
