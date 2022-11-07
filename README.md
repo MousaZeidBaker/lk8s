@@ -65,9 +65,31 @@ Start a local Kubernetes cluster
 k3d cluster create --config k3d-config.yaml
 ```
 
-Install Flux onto the cluster
+Install Flux into the cluster
 ```shell
-flux bootstrap git --url=git@github.com:MousaZeidBaker/lk8s.git --branch master --path ./clusters/prod
+flux install
+```
+
+Create a source
+```shell
+flux create source git flux-system \
+  --url=https://github.com/MousaZeidBaker/lk8s \
+  --branch=feat/flux \
+  --interval=1m0s
+```
+
+Create a Kustomization resource
+```shell
+flux create kustomization flux-system \
+  --source=flux-system \
+  --path="clusters/prod" \
+  --prune=true \
+  --interval=1m0s
+```
+
+Get all resources and statuses
+```shell
+flux get all --all-namespaces
 ```
 
 ### Build Docker images
