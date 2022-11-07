@@ -7,12 +7,11 @@ All you need for a local Kubernetes setup in one place
 1. [Kubernetes basics and concepts](#kubernetes-basics-and-concepts)
 2. [Prerequisites](#prerequisites)
 3. [Getting started](#getting-started)
-    1. [Build Docker images](#build-docker-images)
-    2. [Deploy apps](#deploy-apps)
-    4. [Port forwarding](#port-forwarding)
-    6. [Access pod B from another pod A](#access-pod-b-from-another-pod-a)
-    7. [Access host resources from a pod](#access-host-resources-from-a-pod)
-7. [Logs](#logs)
+4. [Local containers](#local-containers)
+5. [Port forwarding](#port-forwarding)
+6. [Access pod B from another pod A](#access-pod-b-from-another-pod-a)
+7. [Access host resources from a pod](#access-host-resources-from-a-pod)
+8. [Logs](#logs)
 
 ## Kubernetes basics and concepts
 
@@ -49,66 +48,36 @@ while traffic to `/bar` can be routed to a `bar` service.
 Following guide shows how to setup a local Kubernetes cluster and how to deploy
 different containers:
 
-- [hello](./apps/hello/) container mainteined locally in `/apps` directory
-- [whoami](https://hub.docker.com/r/traefik/whoami) container maintained by 3rd
-parties that can be pulled from public container registries
-- [wordpress](https://hub.docker.com/r/bitnami/wordpress/) container with
-  [persistent
-  volumes](https://kubernetes.io/docs/concepts/storage/persistent-volumes/)
-- [ingress-nginx](https://kubernetes.github.io/ingress-nginx/) controller
-- [Kubernetes
-Dasboard](https://kubernetes.io/docs/tasks/access-application-cluster/web-ui-dashboard/)
+- infrastructure
+  - [ingress-nginx](https://kubernetes.github.io/ingress-nginx/) controller
+  - [Kubernetes
+  Dasboard](https://kubernetes.io/docs/tasks/access-application-cluster/web-ui-dashboard/)
+- apps
+  - [whoami](https://hub.docker.com/r/traefik/whoami) container maintained by 3rd
+  parties that can be pulled from public container registries
+  - [wordpress](https://hub.docker.com/r/bitnami/wordpress/) container with
+    [persistent
+    volumes](https://kubernetes.io/docs/concepts/storage/persistent-volumes/)
+  - [hello](./my-containers/hello/) container mainteined locally in `/my-containers` directory
 
 Start a local Kubernetes cluster 
 ```shell
 k3d cluster create --config k3d-config.yaml
 ```
 
-### Build Docker images
-
-Images are usually built and pushed into a registry and then pulled (downloaded)
-by a Kubernetes cluster. But when developing locally one can instead use a local
-registry. K3d has already created one, view it with `docker ps --filter
-name=registry`.
-
-Build images located in the `/apps` directory
-```shell
-for DIR in apps/**; do docker build --tag ${DIR##*/} --tag localhost:5000/${DIR##*/} $DIR; done
-```
-
-> Note: Each directory inside `/apps` must contain a Dockerfile, the directory
-> name is used as the image name and images are tagged with the `latest` tag.
-
-Push images to the local registry
-```shell
-for DIR in apps/**; do docker push localhost:5000/${DIR##*/}; done
-```
-
-> Note: To list images in the local registry use `curl
-> "http://localhost:5000/v2/_catalog"`
-
-### Deploy apps
-
 Copy `.env` file for each deployment and configure env variables as needed
 ```shell
 find kubernetes -type f -name ".env.example" -exec sh -c 'cp --no-clobber ${1} ${1%/*}/.env' sh_cp {} \;
 ```
 
-Apply Kubernetes manifests. To delete resources replace `apply` with `delete`.
+Apply Kubernetes manifests, to delete resources replace `apply` with `delete`
 ```shell
 kubectl apply --kustomize kubernetes
 ```
 
-That's it! You've successfully completed the setup.
-
-Hit `hello` pod over HTTP
+List pods, wait for pods to be ready before proceeding
 ```shell
-curl "http://hello.127.0.0.1.nip.io:8080/v1/echo"
-```
-
-Hit `hello` pod over HTTPS
-```shell
-curl --insecure "https://hello.127.0.0.1.nip.io:8443/v1/echo"
+kubectl get pods
 ```
 
 Hit `whoami` pod over HTTP
@@ -116,18 +85,56 @@ Hit `whoami` pod over HTTP
 curl "http://whoami.127.0.0.1.nip.io:8080"
 ```
 
+Hit `whoami` pod over HTTPS
+```shell
+curl --insecure "https://whoami.127.0.0.1.nip.io:8443/v1/echo"
+```
+
 Access `Kubernetes Dashboard` at
 [`http://kubernetes.127.0.0.1.nip.io:8080/dashboard/`](http://kubernetes.127.0.0.1.nip.io:8080/dashboard/)
 
 Access `Wordpress` at [`http://wordpress.127.0.0.1.nip.io:8080/`](http://wordpress.127.0.0.1.nip.io:8080/)
 
-> Note: If an app inside `/apps` is modified make sure to first re-build the
-> image, then re-push it to the local registry, then destroy the related
-> deployment resource and lastly re-apply it. Otherwise changes won't be detected
-> because deployments are (for simplicity) configured to use the `latest` tag
-> instead of unique tags.
+### Local containers
 
-#### Port forwarding
+Images are usually built and pushed into a registry and then pulled (downloaded)
+by a Kubernetes cluster. But when developing locally one can instead use a local
+registry. K3d has already created one, view it with `docker ps --filter
+name=registry`.
+
+Build images located in the `/my-containers` directory
+```shell
+for DIR in my-containers/**; do docker build --tag ${DIR##*/} --tag localhost:5000/${DIR##*/} $DIR; done
+```
+
+> Note: Each directory inside `/my-containers` must contain a Dockerfile, the directory
+> name is used as the image name and images are tagged with the `latest` tag.
+
+Push images to the local registry
+```shell
+for DIR in my-containers/**; do docker push localhost:5000/${DIR##*/}; done
+```
+
+> Note: To list images in the local registry use `curl
+> "http://localhost:5000/v2/_catalog"`
+
+Deploy `hello` app
+```shell
+kubectl apply --kustomize kubernetes/hello
+```
+
+> Note: If a container inside `/my-containers` is modified make sure to first
+> re-build the image, then re-push it to the local registry, then destroy the
+> related deployment resource and lastly re-apply it. Otherwise changes won't be
+> detected because deployments are (for simplicity) configured to use the
+> `latest` tag instead of unique tags.
+
+Hit `hello` pod over HTTP
+```shell
+curl "http://hello.127.0.0.1.nip.io:8080/v1/echo"
+```
+
+### Port forwarding
 
 Some apps are not supposed to be exposed outside the cluster such as a database
 or an internal api. In these cases port forwarding can be used to access them.
@@ -147,7 +154,7 @@ Hit the `hello` pod
 curl "http://localhost:9000/v1/echo"
 ```
 
-#### Access pod B from another pod A
+### Access pod B from another pod A
 
 Get a shell to the `hello` pod
 ```shell
@@ -165,7 +172,7 @@ curl "http://whoami/"
 curl "http://whoami.default.svc.cluster.local/"
 ```
 
-#### Access host resources from a pod
+### Access host resources from a pod
 
 Get a shell to the `hello` pod
 ```shell
