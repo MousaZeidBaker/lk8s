@@ -2,10 +2,10 @@
 apiVersion: networking.k8s.io/v1
 kind: Ingress
 metadata:
-  name: whoami
-  namespace: default
+  name: hello
+  namespace: apps
   annotations:
-    nginx.ingress.kubernetes.io/rewrite-target: /
+    nginx.ingress.kubernetes.io/rewrite-target: /$1
     nginx.ingress.kubernetes.io/ssl-redirect: false  # force SSL redirect (only port 443)
     nginx.ingress.kubernetes.io/configuration-snippet: |
       # uncomment to force SSL redirect with custom port
@@ -14,16 +14,16 @@ spec:
   ingressClassName: nginx
   tls:
     - hosts:
-        - whoami.127.0.0.1.nip.io
+        - hello.127.0.0.1.nip.io
   rules:
-    - host: whoami.127.0.0.1.nip.io
+    - host: hello.127.0.0.1.nip.io
       http:
         paths:
-          - path: /
-            pathType: Exact
+          - path: /(.*)
+            pathType: Prefix
             backend:
               service:
-                name: whoami
+                name: hello
                 port:
                   number: 80
 ...

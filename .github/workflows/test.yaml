@@ -24,10 +24,10 @@ jobs:
 
       - name: Deploy apps
         run: |
-          find kubernetes -type f -name ".env.example" -exec sh -c 'cp --no-clobber ${1} ${1%/*}/.env' sh_cp {} \;
-          kubectl apply --kustomize kubernetes
-          echo "Waiting for service endpoints to become active.."
-          sleep 40
+          find apps -type f -name ".env.example" -exec sh -c 'cp --no-clobber ${1} ${1%/*}/.env' sh_cp {} \;
+          kubectl apply --kustomize infrastructure
+          kubectl apply --kustomize apps
+          kubectl wait --for=condition=Available=true --timeout=1m --namespace apps deployment/whoami
           kubectl get endpoints
 
       - name: Test whoami app

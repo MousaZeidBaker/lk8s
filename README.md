@@ -43,41 +43,58 @@ while traffic to `/bar` can be routed to a `bar` service.
   the cluster
 - port `8080` and `8443` must not be in use
 
-## Getting started
+## Repository structure
 
-Following guide shows how to setup a local Kubernetes cluster and how to deploy
-different containers:
+```
+├── apps
+│   ├── hello
+│   ├── whoami 
+│   └── wordpress
+└── infrastructure
+    ├── ingress-nginx
+    └── kubernetes-dashboard
+```
 
-- infrastructure
-  - [ingress-nginx](https://kubernetes.github.io/ingress-nginx/) controller
-  - [Kubernetes
-  Dasboard](https://kubernetes.io/docs/tasks/access-application-cluster/web-ui-dashboard/)
-- apps
-  - [whoami](https://hub.docker.com/r/traefik/whoami) container maintained by 3rd
-  parties that can be pulled from public container registries
+- `apps` contains applications
+  - [hello](./my-containers/hello/) container mainteined locally in
+    `/my-containers` directory
+  - [whoami](https://hub.docker.com/r/traefik/whoami) container maintained by
+  3rd parties and pulled from public registries
   - [wordpress](https://hub.docker.com/r/bitnami/wordpress/) container with
     [persistent
     volumes](https://kubernetes.io/docs/concepts/storage/persistent-volumes/)
-  - [hello](./my-containers/hello/) container mainteined locally in `/my-containers` directory
+- `infrastructure` contains common tools
+  - [ingress-nginx](https://kubernetes.github.io/ingress-nginx/) controller
+  - [Kubernetes
+  Dasboard](https://kubernetes.io/docs/tasks/access-application-cluster/web-ui-dashboard/)
+
+The separation between apps and infrastructure makes it possible to deploy
+resources in a certain order.
+
+## Getting started
 
 Start a local Kubernetes cluster 
 ```shell
 k3d cluster create --config k3d-config.yaml
 ```
 
-Copy `.env` file for each deployment and configure env variables as needed
+Copy `.env` file for each app and configure env variables as needed
 ```shell
-find kubernetes -type f -name ".env.example" -exec sh -c 'cp --no-clobber ${1} ${1%/*}/.env' sh_cp {} \;
+find apps -type f -name ".env.example" -exec sh -c 'cp --no-clobber ${1} ${1%/*}/.env' sh_cp {} \;
 ```
 
-Apply Kubernetes manifests, to delete resources replace `apply` with `delete`
+Apply manifests, to delete resources replace `apply` with `delete`
 ```shell
-kubectl apply --kustomize kubernetes
+kubectl apply --kustomize infrastructure
 ```
 
-List pods, wait for pods to be ready before proceeding
 ```shell
-kubectl get pods
+kubectl apply --kustomize apps
+```
+
+Wait for apps to be ready before proceeding
+```shell
+kubectl wait --for=condition=Available=true --timeout=1m --namespace apps deployment/whoami
 ```
 
 Hit `whoami` pod over HTTP
@@ -87,7 +104,7 @@ curl "http://whoami.127.0.0.1.nip.io:8080"
 
 Hit `whoami` pod over HTTPS
 ```shell
-curl --insecure "https://whoami.127.0.0.1.nip.io:8443/v1/echo"
+curl --insecure "https://whoami.127.0.0.1.nip.io:8443"
 ```
 
 Access `Kubernetes Dashboard` at
@@ -120,7 +137,7 @@ for DIR in my-containers/**; do docker push localhost:5000/${DIR##*/}; done
 
 Deploy `hello` app
 ```shell
-kubectl apply --kustomize kubernetes/hello
+kubectl apply --kustomize apps/hello
 ```
 
 > Note: If a container inside `/my-containers` is modified make sure to first
@@ -169,7 +186,7 @@ curl "http://whoami/"
 
 # when pod B is NOT in the same namespace as pod A
 # curl "<service-name>.<namespace-name>.svc.cluster.local/some/path"
-curl "http://whoami.default.svc.cluster.local/"
+curl "http://whoami.apps.svc.cluster.local/"
 ```
 
 ### Access host resources from a pod
