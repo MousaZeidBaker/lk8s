@@ -29,7 +29,8 @@ jobs:
           kubectl apply --kustomize infrastructure
           kubectl wait --for=condition=Available=true --timeout=1m --namespace ingress-nginx deployment/ingress-nginx-controller
           kubectl apply --kustomize apps
-          kubectl wait --for=condition=Available=true --timeout=1m --namespace apps deployment/whoami
+          echo "Waiting for service endpoints to become active.."
+          sleep 40
           kubectl get endpoints
       # yamllint enable rule:line-length
 
