@@ -6,12 +6,13 @@ All you need for a local Kubernetes setup in one place
 
 1. [Kubernetes basics and concepts](#kubernetes-basics-and-concepts)
 2. [Prerequisites](#prerequisites)
-3. [Getting started](#getting-started)
-4. [Local containers](#local-containers)
-5. [Port forwarding](#port-forwarding)
-6. [Access pod B from another pod A](#access-pod-b-from-another-pod-a)
-7. [Access host resources from a pod](#access-host-resources-from-a-pod)
-8. [Logs](#logs)
+3. [Repository structure](#repository-structure)
+4. [Getting started](#getting-started)
+5. [Local containers](#local-containers)
+6. [Port forwarding](#port-forwarding)
+7. [Access pod B from another pod A](#access-pod-b-from-another-pod-a)
+8. [Access host resources from a pod](#access-host-resources-from-a-pod)
+9. [Logs](#logs)
 
 ## Kubernetes basics and concepts
 
