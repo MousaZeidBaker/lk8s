@@ -26,6 +26,7 @@ jobs:
         run: |
           find apps -type f -name ".env.example" -exec sh -c 'cp --no-clobber ${1} ${1%/*}/.env' sh_cp {} \;
           kubectl apply --kustomize infrastructure
+          kubectl wait --for=condition=Available=true --namespace ingress-nginx deployment/ingress-nginx-controller
           kubectl apply --kustomize apps
           kubectl wait --for=condition=Available=true --timeout=1m --namespace apps deployment/whoami
           kubectl get endpoints
