@@ -1,14 +1,16 @@
 ---
 apiVersion: kustomize.config.k8s.io/v1beta1
 kind: Kustomization
-
+namespace: apps
 resources:
+  - db
   - deployment.yaml
-  - service.yaml
   - ingress.yaml
-
+  - pv.yaml
+  - pvc.yaml
+  - service.yaml
 secretGenerator:
-  - name: hello
+  - name: wordpress
     envs:
       - .env
 ...
