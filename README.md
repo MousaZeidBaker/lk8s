@@ -42,6 +42,7 @@ while traffic to `/bar` can be routed to a `bar` service.
 - [k3d](https://k3d.io/) to setup a local Kubernetes cluster
 - [kubectl](https://kubernetes.io/docs/tasks/tools/#kubectl) to communicate with
   the cluster
+- [Flux CLI](https://fluxcd.io/flux/cmd/) a continuous delivery tool that keeps clusters in sync
 - port `8080` and `8443` must not be in use
 
 ## Repository structure
@@ -53,21 +54,24 @@ while traffic to `/bar` can be routed to a `bar` service.
 │   └── wordpress
 └── infrastructure
     ├── ingress-nginx
-    └── kubernetes-dashboard
+    ├── kubernetes-dashboard
+    ├── vault
+    └── external-secrets
 ```
 
-- `apps` contains applications
-  - [hello](./my-containers/hello/) container mainteined locally in
-    `/my-containers` directory
-  - [whoami](https://hub.docker.com/r/traefik/whoami) container maintained by
-  3rd parties and pulled from public registries
-  - [wordpress](https://hub.docker.com/r/bitnami/wordpress/) container with
+- `apps` dir contains applications
+  - [hello](./my-containers/hello/) app mainteined locally in `/my-containers`
+    directory
+  - [whoami](https://hub.docker.com/r/traefik/whoami) app maintained by 3rd
+  parties and pulled from public registries
+  - [wordpress](https://hub.docker.com/r/bitnami/wordpress/) app with
     [persistent
     volumes](https://kubernetes.io/docs/concepts/storage/persistent-volumes/)
-- `infrastructure` contains common tools
+- `infrastructure` dir contains common tools
   - [ingress-nginx](https://kubernetes.github.io/ingress-nginx/) controller
-  - [Kubernetes
-  Dasboard](https://kubernetes.io/docs/tasks/access-application-cluster/web-ui-dashboard/)
+  - [kubernetes-dasboard](https://kubernetes.io/docs/tasks/access-application-cluster/web-ui-dashboard/)
+  - [vault](https://developer.hashicorp.com/vault/) secret manager
+  - [external-secrets](https://external-secrets.io/) injects secrets into pods
 
 The separation between apps and infrastructure makes it possible to deploy
 resources in a certain order.
@@ -79,23 +83,62 @@ Start a local Kubernetes cluster
 k3d cluster create --config k3d-config.yaml
 ```
 
-Copy `.env` file for each app and configure env variables as needed
+Install flux components into cluster
 ```shell
-find apps -type f -name ".env.example" -exec sh -c 'cp --no-clobber ${1} ${1%/*}/.env' sh_cp {} \;
+flux install
 ```
 
-Apply manifests, to delete resources replace `apply` with `delete`
+Apply infrastructure manifests
 ```shell
 kubectl apply --kustomize infrastructure
 ```
 
+Wait for ingress-nginx to be ready
+```shell
+kubectl wait \
+  --for=condition=Available=true \
+  --timeout=2m \
+  --namespace ingress-nginx \
+  deployment/ingress-nginx-controller
+```
+
+Apply `ClusterSecretStore`, the gateway to the secret backend
+```shell
+kubectl apply --kustomize infrastructure/external-secrets/crs
+```
+
+Access `Kubernetes Dashboard` at
+[`http://kubernetes.127.0.0.1.nip.io:8080/dashboard/`](http://kubernetes.127.0.0.1.nip.io:8080/dashboard/)
+
+Access `Vault Web UI` at
+[`http://vault.127.0.0.1.nip.io:8080/`](http://vault.127.0.0.1.nip.io:8080/),
+token can be found in `volumes/storage/vault/cluster-keys.json`
+
+Before deploying the apps, create secrets either manually using the
+Web UI or by running following script to create secrets from each app's
+`.secret.example.json` file
+```shell
+VAULT_TOKEN=$(cat volumes/storage/vault/cluster-keys.json | tr -d '[:space:]' | grep -Eo '"root_token"[^}]*' | grep -Eo '[^:]*$' | sed 's/^"\(.*\)"$/\1/')
+for SECRET in $(find apps -type f -name ".secret.example.json")
+do
+  SECRET_NAME=$(basename $(dirname $SECRET))
+  curl \
+    --header "X-Vault-Token: $VAULT_TOKEN" \
+    --header "Content-Type: application/merge-patch+json" \
+    --request POST \
+    --data @$SECRET \
+    http://vault.127.0.0.1.nip.io:8080/v1/secret/data/$SECRET_NAME
+done
+```
+
+Deploy apps
 ```shell
 kubectl apply --kustomize apps
 ```
 
-Wait for apps to be ready before proceeding
+Manually trigger a secret refresh when a secret in vault is updated
 ```shell
-kubectl wait --for=condition=Available=true --timeout=1m --namespace apps deployment/whoami
+kubectl annotate es whoami force-sync=$(date +%s) --overwrite --namespace apps
 ```
 
 Hit `whoami` pod over HTTP
@@ -108,12 +151,9 @@ Hit `whoami` pod over HTTPS
 curl --insecure "https://whoami.127.0.0.1.nip.io:8443"
 ```
 
-Access `Kubernetes Dashboard` at
-[`http://kubernetes.127.0.0.1.nip.io:8080/dashboard/`](http://kubernetes.127.0.0.1.nip.io:8080/dashboard/)
-
 Access `Wordpress` at [`http://wordpress.127.0.0.1.nip.io:8080/`](http://wordpress.127.0.0.1.nip.io:8080/)
 
-### Local containers
+## Local containers
 
 Images are usually built and pushed into a registry and then pulled (downloaded)
 by a Kubernetes cluster. But when developing locally one can instead use a local
@@ -152,7 +192,7 @@ Hit `hello` pod over HTTP
 curl "http://hello.127.0.0.1.nip.io:8080/v1/echo"
 ```
 
-### Port forwarding
+## Port forwarding
 
 Some apps are not supposed to be exposed outside the cluster such as a database
 or an internal api. In these cases port forwarding can be used to access them.
@@ -172,7 +212,7 @@ Hit the `hello` pod
 curl "http://localhost:9000/v1/echo"
 ```
 
-### Access pod B from another pod A
+## Access pod B from another pod A
 
 Get a shell to the `hello` pod
 ```shell
@@ -190,7 +230,7 @@ curl "http://whoami/"
 curl "http://whoami.apps.svc.cluster.local/"
 ```
 
-### Access host resources from a pod
+## Access host resources from a pod
 
 Get a shell to the `hello` pod
 ```shell
@@ -205,7 +245,7 @@ curl "host.k3d.internal:9000/"
 > Note: The host must have a running resource. Run `whoami` with `docker run -p
 > 9000:9000 traefik/whoami --port 9000`
 
-### Logs
+## Logs
 
 ```shell
 # show snapshot logs from a deployment named hello
