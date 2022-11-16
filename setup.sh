@@ -15,14 +15,14 @@ kubectl apply --kustomize infrastructure
 # Wait for ingress-nginx to be ready
 kubectl wait \
   --for=condition=Available=true \
-  --timeout=2m \
+  --timeout=4m \
   --namespace ingress-nginx \
   deployment/ingress-nginx-controller
 
 # Apply ClusterSecretStore, the gateway to the secret backend
 kubectl wait \
   --for=condition=Available=true \
-  --timeout=2m \
+  --timeout=4m \
   --namespace external-secrets \
   deployment/external-secrets-webhook
 kubectl apply --kustomize infrastructure/external-secrets/crs
@@ -30,7 +30,7 @@ kubectl apply --kustomize infrastructure/external-secrets/crs
 # Create secrets
 kubectl wait \
   --for=condition=Available=true \
-  --timeout=2m \
+  --timeout=4m \
   --namespace vault \
   pod/vault-0
 VAULT_TOKEN=$(cat volumes/storage/vault/cluster-keys.json | tr -d '[:space:]' | grep -Eo '"root_token"[^}]*' | grep -Eo '[^:]*$' | sed 's/^"\(.*\)"$/\1/')
