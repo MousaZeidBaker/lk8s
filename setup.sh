@@ -29,7 +29,7 @@ kubectl apply --kustomize infrastructure/external-secrets/crs
 
 # Create secrets
 kubectl wait \
-  --for=condition=Available=true \
+  --for=condition=Ready=true \
   --timeout=4m \
   --namespace vault \
   pod/vault-0
