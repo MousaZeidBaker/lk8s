@@ -1,0 +1,125 @@
+---
+apiVersion: helm.toolkit.fluxcd.io/v2beta1
+kind: HelmRelease
+metadata:
+  name: vault
+  namespace: flux-system
+spec:
+  releaseName: vault
+  targetNamespace: vault
+  interval: 10m
+  chart:
+    spec:
+      chart: vault
+      version: 0.22.x
+      sourceRef:
+        kind: HelmRepository
+        name: hashicorp
+        namespace: flux-system
+  # https://github.com/hashicorp/vault-helm/blob/main/values.yaml
+  values:
+    global:
+      enabled: false
+      tlsDisable: true
+
+    server:
+      enabled: true
+
+      logLevel: info
+
+      resources:
+        requests:
+          memory: 256Mi
+          cpu: 250m
+        limits:
+          memory: 256Mi
+          cpu: 250m
+
+      authDelegator:
+        enabled: true
+
+      volumes:
+        - name: vault
+          persistentVolumeClaim:
+            claimName: vault
+
+      volumeMounts:
+        - mountPath: /vault
+          name: vault
+          readOnly: false
+
+      dataStorage:
+        enabled: false
+
+      readinessProbe:
+        enabled: false
+        path: /v1/sys/health?standbyok=true&sealedcode=204&uninitcode=204
+      livenessProbe:
+        enabled: false
+        path: /v1/sys/health?standbyok=true
+        initialDelaySeconds: 60
+
+      standalone:
+        enabled: true
+        config: |
+          ui = true
+          listener "tcp" {
+            tls_disable = 1
+            address = "0.0.0.0:8200"
+            cluster_address = "0.0.0.0:8201"
+          }
+          storage "file" {
+            path = "/vault/data"
+          }
+
+      postStart:
+        - /bin/sh
+        - -c
+        # yamllint disable rule:line-length
+        - |
+          # sleep to let service spin up
+          sleep 5
+
+          # if already initialized, just unseal and exit
+          if vault status -format json | grep '"initialized": true'; then
+            VAULT_UNSEAL_KEY=$(cat /vault/cluster-keys.json | tr -d '[:space:]' | grep -Eo '"unseal_keys_b64"[^,]*' | grep -Eo '[^:]*$' | sed 's/^\["\(.*\)"\]$/\1/')
+            vault operator unseal $VAULT_UNSEAL_KEY
+            exit 0
+          fi
+
+          # initialize vault
+          vault operator init -key-shares=1 -key-threshold=1 -format=json > /vault/cluster-keys.json
+
+          # capture key & token
+          VAULT_UNSEAL_KEY=$(cat /vault/cluster-keys.json | tr -d '[:space:]' | grep -Eo '"unseal_keys_b64"[^,]*' | grep -Eo '[^:]*$' | sed 's/^\["\(.*\)"\]$/\1/')
+          VAULT_TOKEN=$(cat /vault/cluster-keys.json | tr -d '[:space:]' | grep -Eo '"root_token"[^}]*' | grep -Eo '[^:]*$' | sed 's/^"\(.*\)"$/\1/')
+
+          # unseal vault and login
+          vault operator unseal $VAULT_UNSEAL_KEY
+          vault login -no-print $VAULT_TOKEN
+
+          # enable kv secrets engine
+          vault secrets enable -path=secret kv-v2
+
+          # enable the Kubernetes authentication method
+          vault auth enable kubernetes
+
+          # configure the Kubernetes authentication method
+          vault write auth/kubernetes/config kubernetes_host="https://${KUBERNETES_PORT_443_TCP_ADDR}:443"
+
+          # create a readonly policy
+          echo 'path "secret/*" { capabilities = ["read"] }' | vault policy write readonly -
+
+          # create an authentication role
+          vault write auth/kubernetes/role/k8s-role \
+              bound_service_account_names=* \
+              bound_service_account_namespaces=* \
+              policies=readonly \
+              token_max_ttl=20m \
+              ttl=10m
+        # yamllint disable rule:line-length
+
+  # https://fluxcd.io/docs/components/helm/api/#helm.toolkit.fluxcd.io/v2beta1.Install
+  install:
+    createNamespace: true
+...
